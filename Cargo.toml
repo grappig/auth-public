@@ -1,0 +1,22 @@
+[package]
+name = "key-system-verify"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Public Ed25519 license verification SDK"
+license = "MIT"
+repository = "https://github.com/grappig/auth-public"
+readme = "README.md"
+keywords = ["licensing", "ed25519", "verification"]
+categories = ["cryptography", "authentication"]
+
+[dependencies]
+base64 = "0.22"
+serde_json = "1"
+thiserror = "2"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"
+strip = "symbols"
