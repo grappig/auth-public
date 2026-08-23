@@ -5,5 +5,7 @@
 //! contains no signing API, private-key parser, key generator, or server credential support.
 
 mod error;
+mod models;
 
 pub use error::{KeySystemError, Result};
+pub use models::{ClockFloor, LicenseClaims, RevocationChecker, VerificationPolicy};
