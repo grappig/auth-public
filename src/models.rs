@@ -22,8 +22,7 @@ pub struct LicenseClaims {
 
 impl LicenseClaims {
     pub fn from_json(payload: &[u8]) -> Result<Self> {
-        let claims: Self =
-            serde_json::from_slice(payload).map_err(|_| KeySystemError::InvalidPayload)?;
+        let claims: Self = serde_json::from_slice(payload)?;
         claims.validate()?;
         Ok(claims)
     }
@@ -86,7 +85,7 @@ impl LicenseClaims {
             .unwrap_or(false))
     }
 
-    pub fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         validate_identifier(&self.key_id)?;
         validate_identifier(&self.client_id)?;
         validate_identifier(&self.software_target)?;
@@ -146,7 +145,7 @@ impl ClockFloor {
         Ok(self.0)
     }
 
-    pub fn advance(&mut self, now: DateTime<Utc>, max_clock_drift: Duration) -> Result<()> {
+    pub(crate) fn advance(&mut self, now: DateTime<Utc>, max_clock_drift: Duration) -> Result<()> {
         if let Some(previous) = self.0 {
             if now < previous - max_clock_drift {
                 return Err(KeySystemError::ClockRollback);
