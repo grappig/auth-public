@@ -6,6 +6,8 @@
 
 mod error;
 mod models;
+mod verifier;
 
 pub use error::{KeySystemError, Result};
 pub use models::{ClockFloor, LicenseClaims, RevocationChecker, VerificationPolicy};
+pub use verifier::{License, LicenseVerifier};
