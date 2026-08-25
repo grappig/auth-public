@@ -1,6 +1,6 @@
 use crate::error::{KeySystemError, Result};
 use chrono::{DateTime, Duration, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 
 const MAX_IDENTIFIER_LENGTH: usize = 128;
@@ -69,7 +69,7 @@ impl LicenseClaims {
         }
         let mut found = 0_u8;
         for entitlement in &self.features {
-            found |= entitlement.as_bytes().ct_eq(feature.as_bytes()).unwrap_u8();
+            found |= u8::from(bool::from(entitlement.as_bytes().ct_eq(feature.as_bytes())));
         }
         Ok(found == 1)
     }
@@ -78,11 +78,10 @@ impl LicenseClaims {
         if hardware_id.is_empty() || hardware_id.len() > MAX_IDENTIFIER_LENGTH {
             return Err(KeySystemError::InvalidPolicy("invalid hardware identifier"));
         }
-        Ok(self
-            .hardware_id
-            .as_ref()
-            .map(|bound| bound.as_bytes().ct_eq(hardware_id.as_bytes()).unwrap_u8() == 1)
-            .unwrap_or(false))
+        if let Some(bound) = &self.hardware_id {
+            return Ok(bool::from(bound.as_bytes().ct_eq(hardware_id.as_bytes())));
+        }
+        Ok(false)
     }
 
     pub(crate) fn validate(&self) -> Result<()> {
@@ -133,7 +132,7 @@ impl VerificationPolicy {
 }
 
 /// Persist this high-water mark in application-owned protected storage between launches.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct ClockFloor(Option<DateTime<Utc>>);
 
 impl ClockFloor {
@@ -147,12 +146,92 @@ impl ClockFloor {
 
     pub(crate) fn advance(&mut self, now: DateTime<Utc>, max_clock_drift: Duration) -> Result<()> {
         if let Some(previous) = self.0 {
-            if now < previous - max_clock_drift {
+            let minimum_allowed = previous
+                .checked_sub_signed(max_clock_drift)
+                .ok_or(KeySystemError::ClockRollback)?;
+            if now < minimum_allowed {
                 return Err(KeySystemError::ClockRollback);
             }
         }
-        if self.0.map(|previous| now > previous).unwrap_or(true) {
+        if self.0.is_none_or(|previous| now > previous) {
             self.0 = Some(now);
+        }
+        Ok(())
+    }
+}
+
+/// Application-provided storage for verifier state.
+///
+/// Implementations must use integrity-protected, durable storage and make `store` atomic. A
+/// platform keychain, TPM-backed store, or server-synchronised secure store is appropriate. An
+/// attacker able to replace this state can bypass local clock and revocation rollback detection.
+pub trait ProtectedState: Send {
+    fn load(&self) -> Result<ClientSecurityState>;
+    fn store(&mut self, state: &ClientSecurityState) -> Result<()>;
+}
+
+/// State that must survive application restarts to enforce clock and revocation freshness.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ClientSecurityState {
+    clock_floor: ClockFloor,
+    revocation: Option<RevocationFreshness>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct RevocationFreshness {
+    pub(crate) sequence: u64,
+    pub(crate) issued_at: DateTime<Utc>,
+    pub(crate) response_hash: [u8; 32],
+}
+
+impl ClientSecurityState {
+    pub fn new(last_verified_at: Option<DateTime<Utc>>) -> Result<Self> {
+        Ok(Self {
+            clock_floor: ClockFloor::new(last_verified_at)?,
+            revocation: None,
+        })
+    }
+
+    /// Serialize only for use inside a `ProtectedState` implementation.
+    pub fn to_persisted_bytes(&self) -> Result<Vec<u8>> {
+        Ok(serde_json::to_vec(self)?)
+    }
+
+    /// Restore state previously returned by [`Self::to_persisted_bytes`].
+    pub fn from_persisted_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() > 1_024 {
+            return Err(KeySystemError::InvalidPayload);
+        }
+        let state: Self = serde_json::from_slice(bytes)?;
+        state.validate()?;
+        Ok(state)
+    }
+
+    pub fn last_verified_at(&self) -> Result<Option<DateTime<Utc>>> {
+        self.clock_floor.last_verified_at()
+    }
+
+    pub(crate) fn advance_clock(
+        &mut self,
+        now: DateTime<Utc>,
+        max_clock_drift: Duration,
+    ) -> Result<()> {
+        self.clock_floor.advance(now, max_clock_drift)
+    }
+
+    pub(crate) fn revocation(&self) -> Option<&RevocationFreshness> {
+        self.revocation.as_ref()
+    }
+
+    pub(crate) fn set_revocation(&mut self, freshness: RevocationFreshness) {
+        self.revocation = Some(freshness);
+    }
+
+    fn validate(&self) -> Result<()> {
+        if let Some(freshness) = &self.revocation {
+            if freshness.issued_at.timestamp() < 0 {
+                return Err(KeySystemError::InvalidPayload);
+            }
         }
         Ok(())
     }
