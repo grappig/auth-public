@@ -181,7 +181,8 @@ impl RevocationVerifier {
         if let Some(previous) = state.revocation() {
             if parsed.sequence < previous.sequence
                 || parsed.issued_at < previous.issued_at
-                || (parsed.sequence == previous.sequence && response_hash != previous.response_hash)
+                || (parsed.sequence == previous.sequence
+                    && !bool::from(response_hash.ct_eq(&previous.response_hash)))
             {
                 return Err(KeySystemError::RevocationRollback);
             }
