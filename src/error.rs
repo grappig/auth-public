@@ -12,6 +12,8 @@ pub enum KeySystemError {
     InvalidPublicKey,
     #[error("license signature is invalid")]
     InvalidSignature,
+    #[error("the token references an unknown signing key")]
+    UnknownSigningKey,
     #[error("license does not target this software")]
     SoftwareTargetMismatch,
     #[error("license issue time is too far in the future")]
@@ -22,6 +24,16 @@ pub enum KeySystemError {
     ClockRollback,
     #[error("license was revoked")]
     Revoked,
+    #[error("revocation response is malformed")]
+    MalformedRevocationResponse,
+    #[error("revocation response signature is invalid")]
+    InvalidRevocationSignature,
+    #[error("revocation response is not fresh")]
+    StaleRevocationResponse,
+    #[error("revocation response rolls back the persisted revocation state")]
+    RevocationRollback,
+    #[error("protected verifier state could not be persisted")]
+    StateStorage,
     #[error("hardware identifier does not match the license")]
     HardwareMismatch,
     #[error("invalid verification policy: {0}")]

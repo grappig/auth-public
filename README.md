@@ -1,4 +1,4 @@
-Verify `ksl1` licenses with an embedded Ed25519 public key. This crate only verifies licenses; it cannot create them.
+Verify legacy `ksl1` and key-rotatable `ksl2` licenses with embedded Ed25519 public keys. This crate only verifies licenses; it cannot create them.
 
 ```rust
 use chrono::Utc;
@@ -17,3 +17,13 @@ assert!(license.has_feature("reports")?);
 assert!(license.matches_hardware("hashed-device-id")?);
 # Ok::<(), key_system_verify::KeySystemError>(())
 ```
+
+For new integrations, use `VerificationKeyRing` and `LicenseVerifier::new_key_ring`. `ksl2`
+tokens use `ksl2.<signing-key-id>.<base64url-payload>.<base64url-signature>` and sign the first
+three segments. During migration, `new_with_legacy_key` accepts both formats.
+
+Signed revocation responses use a separately embedded revocation-authority public key and the
+format `ksr1.<base64url-payload>.<base64url-signature>`. Verify them with `RevocationVerifier`
+and persist `ClientSecurityState` with a platform-protected, durable `ProtectedState`
+implementation. This persistence is required for clock and revocation rollback protection across
+restarts; plain files without integrity protection are not sufficient.
