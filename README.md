@@ -20,7 +20,8 @@ assert!(license.matches_hardware("hashed-device-id")?);
 
 For new integrations, use `VerificationKeyRing` and `LicenseVerifier::new_key_ring`. `ksl2`
 tokens use `ksl2.<signing-key-id>.<base64url-payload>.<base64url-signature>` and sign the first
-three segments. During migration, `new_with_legacy_key` accepts both formats.
+three segments under a fixed domain separator. During migration, `new_with_legacy_key` accepts
+both formats.
 
 Signed revocation responses use a separately embedded revocation-authority public key and the
 format `ksr1.<base64url-payload>.<base64url-signature>`. Verify them with `RevocationVerifier`
