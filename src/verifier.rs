@@ -17,20 +17,17 @@ const PUBLIC_KEY_LENGTH: usize = 32;
 const SIGNATURE_LENGTH: usize = 64;
 const MAX_KEY_RING_SIZE: usize = 16;
 const MAX_SIGNING_KEY_ID_LENGTH: usize = 64;
-/// Exact Ed25519 domain separator for `ksl2` signatures.
 pub const KSL2_SIGNING_PREFIX: &[u8] = b"key-system/license/ksl2/v1\0";
 
 #[derive(Zeroize, ZeroizeOnDrop)]
 struct SensitiveSignature([u8; SIGNATURE_LENGTH]);
 
-/// A public signing key used by a `ksl2` token. The identifier is signed as part of the token.
 #[derive(Clone, Debug)]
 pub struct EmbeddedVerificationKey {
     pub key_id: String,
     pub public_key: String,
 }
 
-/// A bounded, application-embedded public key ring used to verify rotation-ready `ksl2` tokens.
 #[derive(Clone, Debug)]
 pub struct VerificationKeyRing {
     keys: Vec<(String, VerifyingKey)>,
@@ -68,7 +65,6 @@ pub struct LicenseVerifier {
 }
 
 impl LicenseVerifier {
-    /// Construct a legacy-only verifier that accepts existing `ksl1` tokens.
     pub fn new_embedded(
         embedded_public_key: &str,
         software_target: impl Into<String>,
@@ -82,7 +78,6 @@ impl LicenseVerifier {
         )
     }
 
-    /// Construct a verifier that accepts only key-rotatable `ksl2` tokens.
     pub fn new_key_ring(
         key_ring: VerificationKeyRing,
         software_target: impl Into<String>,
@@ -91,7 +86,6 @@ impl LicenseVerifier {
         Self::new_with_legacy_key(None, key_ring, software_target, policy)
     }
 
-    /// Construct a transition verifier that accepts legacy `ksl1` and rotation-ready `ksl2`.
     pub fn new_with_legacy_key(
         legacy_public_key: Option<&str>,
         key_ring: VerificationKeyRing,
@@ -112,8 +106,6 @@ impl LicenseVerifier {
         })
     }
 
-    /// Legacy API using an in-memory clock floor. Use protected state for restart-safe rollback
-    /// protection in production.
     pub fn verify(
         &self,
         token: &str,
@@ -127,7 +119,6 @@ impl LicenseVerifier {
         Ok(license)
     }
 
-    /// Verify using caller-owned state. Persist this state between launches for rollback defense.
     pub fn verify_with_state(
         &self,
         token: &str,
@@ -141,7 +132,6 @@ impl LicenseVerifier {
         Ok(license)
     }
 
-    /// Verify and persist anti-rollback state before returning a license.
     pub fn verify_with_protected_state(
         &self,
         token: &str,
