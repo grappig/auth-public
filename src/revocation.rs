@@ -16,13 +16,11 @@ const PUBLIC_KEY_LENGTH: usize = 32;
 const SIGNATURE_LENGTH: usize = 64;
 const MAX_REVOKED_KEYS: usize = 4_096;
 const MAX_LICENSE_KEY_ID_LENGTH: usize = 128;
-/// Exact Ed25519 domain separator for `ksr1` signatures.
 pub const KSR1_SIGNING_PREFIX: &[u8] = b"key-system/revocation/ksr1/v1\0";
 
 #[derive(Zeroize, ZeroizeOnDrop)]
 struct SensitiveSignature([u8; SIGNATURE_LENGTH]);
 
-/// Freshness requirements for signed revocation responses.
 #[derive(Clone, Copy, Debug)]
 pub struct RevocationPolicy {
     pub max_age: Duration,
@@ -49,11 +47,6 @@ impl RevocationPolicy {
     }
 }
 
-/// Verification-only client for `ksr1.<base64url(payload)>.<base64url(signature)>` responses.
-///
-/// The authority key must be distinct from every license-signing key. The signed payload contains
-/// `{sequence, issued_at, expires_at, revoked_key_ids}`; the signature covers
-/// `KSR1_SIGNING_PREFIX + <payload>`.
 pub struct RevocationVerifier {
     authority_key: VerifyingKey,
     policy: RevocationPolicy,
@@ -85,7 +78,6 @@ impl RevocationVerifier {
         })
     }
 
-    /// Authenticate and freshness-check a revocation response, atomically updating caller state.
     pub fn verify(
         &self,
         response: &str,
@@ -98,7 +90,6 @@ impl RevocationVerifier {
         Ok(list)
     }
 
-    /// Authenticate a response and persist its anti-rollback metadata before returning it.
     pub fn verify_with_protected_state(
         &self,
         response: &str,

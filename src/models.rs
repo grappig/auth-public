@@ -131,7 +131,6 @@ impl VerificationPolicy {
     }
 }
 
-/// Persist this high-water mark in application-owned protected storage between launches.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct ClockFloor(Option<DateTime<Utc>>);
 
@@ -160,17 +159,11 @@ impl ClockFloor {
     }
 }
 
-/// Application-provided storage for verifier state.
-///
-/// Implementations must use integrity-protected, durable storage and make `store` atomic. A
-/// platform keychain, TPM-backed store, or server-synchronised secure store is appropriate. An
-/// attacker able to replace this state can bypass local clock and revocation rollback detection.
 pub trait ProtectedState: Send {
     fn load(&self) -> Result<ClientSecurityState>;
     fn store(&mut self, state: &ClientSecurityState) -> Result<()>;
 }
 
-/// State that must survive application restarts to enforce clock and revocation freshness.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ClientSecurityState {
     clock_floor: ClockFloor,
@@ -192,12 +185,10 @@ impl ClientSecurityState {
         })
     }
 
-    /// Serialize only for use inside a `ProtectedState` implementation.
     pub fn to_persisted_bytes(&self) -> Result<Vec<u8>> {
         Ok(serde_json::to_vec(self)?)
     }
 
-    /// Restore state previously returned by [`Self::to_persisted_bytes`].
     pub fn from_persisted_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > 1_024 {
             return Err(KeySystemError::InvalidPayload);
